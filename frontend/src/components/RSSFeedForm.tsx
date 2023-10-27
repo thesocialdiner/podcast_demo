@@ -1,55 +1,54 @@
 import { useState } from 'react';
 
-// Define the prop types for the component.
-interface Props {
-  onSubmission: (url: string) => void;
-}
+const RSSFeedForm = ({ onTranscription }: { onTranscription: (transcription: string) => void }) => {
+    const [podcastURL, setPodcastURL] = useState(''); // to manage podcast URL input
+    const [loading, setLoading] = useState(false); // to manage loading state
+    const [error, setError] = useState<string | null>(null); // to manage errors
 
-const RSSFeedForm: React.FC<Props> = ({ onSubmission }) => {
-  // State to hold the URL input value.
-  const [url, setUrl] = useState('');
-  
-  // State to hold any input validation error.
-  const [error, setError] = useState('');
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
 
-  // Event handler for the form submission.
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+        setLoading(true);
+        setError(null);
 
-    // Check if the URL input is empty.
-    if (!url.trim()) {
-      setError('Please enter a valid RSS feed URL.');
-      return;
-    }
-    
-    // If the input is valid, clear any existing errors.
-    setError('');
+        try {
+            const response = await fetch('/api/transcribe', { // assuming your backend endpoint is /api/transcribe
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ url: podcastURL })
+            });
 
-    // Call the onSubmission prop function with the URL value.
-    onSubmission(url);
-  };
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
 
-  return (
-    <div className="mb-4">
-      <form onSubmit={handleSubmit}>
-        <div className="flex">
-          <input
-            type="text"
-            className="border-2 border-gray-300 p-2 w-full"
-            placeholder="Enter RSS feed URL"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          <button type="submit" className="bg-blue-500 text-white p-2 ml-2">
-            Transcribe
-          </button>
+            const data = await response.json();
+            onTranscription(data.transcription); // passing transcription to parent or another handler
+        } catch (error) {
+            console.error('Error fetching transcription:', error);
+            setError('Failed to fetch transcription. Please try again later.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div>
+            <form onSubmit={handleSubmit}>
+                <input
+                    type="text"
+                    value={podcastURL}
+                    onChange={(e) => setPodcastURL(e.target.value)}
+                    placeholder="Enter Podcast URL"
+                />
+                <button type="submit">Transcribe</button>
+            </form>
+            {loading && <p>Loading...</p>}
+            {error && <p style={{ color: 'red' }}>{error}</p>}
         </div>
-        
-        {/* Display error message if there's any */}
-        {error && <p className="text-red-500 mt-2">{error}</p>}
-      </form>
-    </div>
-  );
+    );
 };
 
 export default RSSFeedForm;
